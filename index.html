@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>부동산마스터 · 입찰가 계산기</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['"Pretendard Variable"','Pretendard','ui-sans-serif','system-ui','sans-serif'] },
+        colors: {
+          brand: {
+            50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',
+            400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1'
+          }
+        }
+      }
+    }
+  };
+</script>
+<style>
+  html,body{background:#f8fafc}
+  body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input[type=number]{-moz-appearance:textfield}
+  .num{font-variant-numeric:tabular-nums}
+  .chip{transition:all .15s}
+  .chip[aria-pressed="true"]{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+  .chip[aria-pressed="true"] .pct{color:#e0f2fe}
+  details>summary{list-style:none;cursor:pointer}
+  details>summary::-webkit-details-marker{display:none}
+  .row{display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;padding:.55rem .75rem;border-bottom:1px solid #f1f5f9}
+  .row:last-child{border-bottom:0}
+  .row label{color:#475569;font-size:.9rem}
+  .row input{width:11rem;max-width:55vw;text-align:right;padding:.4rem .55rem;border:1px solid #e2e8f0;border-radius:.5rem;background:#fff}
+  .row input:focus{outline:none;border-color:#38bdf8;box-shadow:0 0 0 3px #e0f2fe}
+  .kv{display:flex;justify-content:space-between;padding:.4rem 0;color:#334155;font-size:.9rem}
+  .kv b{font-weight:600;color:#0f172a}
+  .pill{display:inline-flex;gap:.25rem;align-items:center;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:600}
+</style>
+</head>
+<body class="font-sans text-slate-900">
+<div class="max-w-5xl mx-auto px-4 py-5 md:py-8">
+
+  <header class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2">
+      <div class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center text-lg">🏠</div>
+      <div>
+        <div class="text-[11px] text-slate-500 font-semibold tracking-wide">REAL ESTATE MASTER</div>
+        <h1 class="text-lg md:text-xl font-bold leading-tight">입찰가 계산기</h1>
+      </div>
+    </div>
+    <button id="resetBtn" class="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded-md px-2 py-1 bg-white">초기화</button>
+  </header>
+
+  <!-- 체크리스트 (입력) -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-4 py-3 bg-brand-50 border-b border-brand-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 rounded-md bg-white text-brand-600 grid place-items-center text-xs font-bold border border-brand-200">1</span>
+        <h2 class="font-semibold text-slate-800">입찰 체크리스트</h2>
+      </div>
+      <span class="text-[11px] text-slate-500">입력하면 바로 계산됩니다</span>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-0 md:gap-4 p-2 md:p-4">
+      <div class="rounded-xl border border-slate-100">
+        <div class="row"><label>입찰가</label><input id="in_bid" type="number" inputmode="numeric" placeholder="0" /></div>
+        <div class="row"><label>매도가(예상)</label><input id="in_sale" type="number" inputmode="numeric" placeholder="0" /></div>
+        <div class="row">
+          <label>전용면적 (m²)</label>
+          <input id="in_area" type="number" inputmode="decimal" step="0.01" placeholder="예: 59.84" />
+        </div>
+        <div class="row">
+          <div>
+            <label>취득세율 선택</label>
+            <div id="warn_area" class="hidden mt-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+              전용면적 85㎡ 초과 → 농어촌특별세 0.2~0.6% 추가 가산
+            </div>
+          </div>
+          <span class="num text-sm text-slate-500" id="acq_amount">0 원</span>
+        </div>
+        <div class="px-3 pb-3">
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-1" id="acqChips">
+            <!-- chips injected -->
+          </div>
+          <p id="acq_hint" class="text-[11px] text-slate-500 mt-2 leading-snug"></p>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-100 mt-2 md:mt-0">
+        <div class="row"><label>부대비용</label><input id="in_extra" type="number" inputmode="numeric" placeholder="0" /></div>
+        <div class="row"><label>명도비</label><input id="in_evict" type="number" inputmode="numeric" placeholder="0" /></div>
+        <div class="row"><label>미납관리비</label><label class="flex items-center gap-2"><input id="in_unpaid" type="number" inputmode="numeric" placeholder="0" /></label></div>
+        <div class="row"><label>수리비</label><input id="in_repair" type="number" inputmode="numeric" placeholder="0" /></div>
+        <div class="row"><label>대출이자</label><input id="in_loan" type="number" inputmode="numeric" placeholder="0" /></div>
+        <div class="row"><label>중개수수료</label><input id="in_broker" type="number" inputmode="numeric" placeholder="0" /></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <section class="mt-4 grid md:grid-cols-3 gap-3">
+    <div class="md:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+        <span class="w-6 h-6 rounded-md bg-white text-slate-600 grid place-items-center text-xs font-bold border border-slate-200">2</span>
+        <h2 class="font-semibold text-slate-800">자동 계산 결과</h2>
+      </div>
+      <div class="p-4 space-y-1">
+        <div class="kv"><span>양도차액 <span class="text-xs text-slate-400">(매도가 − 입찰가)</span></span><b class="num" id="out_margin">0 원</b></div>
+        <div class="kv"><span>취득세 <span class="text-xs text-slate-400" id="out_acq_label">(1.1%)</span></span><b class="num" id="out_acq">0 원</b></div>
+        <div class="kv"><span>부대비용 합계</span><b class="num" id="out_costs">0 원</b></div>
+        <hr class="my-2 border-slate-100" />
+        <div class="kv"><span>과세표준 <span class="text-xs text-slate-400">(= 양도차액 − 비용합계)</span></span><b class="num" id="out_base">0 원</b></div>
+        <div class="kv"><span>적용 세율 <span class="text-xs text-slate-400">(지방세 10% 포함 실효)</span></span><b class="num" id="out_rate">—</b></div>
+        <div class="kv"><span>양도소득세 <span class="text-xs text-slate-400">(= 과세표준 × 기본세율 − 누진공제, ×1.1)</span></span><b class="num text-rose-600" id="out_tax">0 원</b></div>
+        <hr class="my-2 border-slate-100" />
+        <div class="kv text-base"><span class="font-semibold">최종 순이익</span><b class="num text-emerald-600 text-lg" id="out_net">0 원</b></div>
+      </div>
+    </div>
+
+    <aside class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+        <span class="w-6 h-6 rounded-md bg-white text-slate-600 grid place-items-center text-xs font-bold border border-slate-200">i</span>
+        <h2 class="font-semibold text-slate-800">세율표 (매매사업자)</h2>
+      </div>
+      <div class="p-3 text-[12px] text-slate-600">
+        <table class="w-full">
+          <thead>
+            <tr class="text-slate-400"><th class="text-left py-1">과세표준</th><th class="text-right">실효(1.1배)</th></tr>
+          </thead>
+          <tbody id="tbl_rates" class="num"></tbody>
+        </table>
+        <p class="mt-2 text-[11px] text-slate-400">※ 실효세율 = 기본세율 × 1.1 (지방소득세 10% 포함). 실제 양도세는 누진공제 반영한 금액으로 계산됩니다.</p>
+      </div>
+    </aside>
+  </section>
+
+  <footer class="mt-6 text-center text-[11px] text-slate-400">
+    근거 세율은 공식 세법 기준이지만, 실제 신고 시에는 세무 전문가 확인 권장. ©부동산마스터
+  </footer>
+</div>
+
+<script>
+/* ===== 세율 데이터 ===== */
+const ACQ = [
+  { key:'1.1',  rate:0.011, label:'1.1%',  desc:'취득세 1.1%' },
+  { key:'3.3',  rate:0.033, label:'3.3%',  desc:'취득세 3.3%' },
+  { key:'3.5',  rate:0.035, label:'3.5%',  desc:'취득세 3.5%' },
+  { key:'8.4',  rate:0.084, label:'8.4%',  desc:'부가세 0.4% 포함' },
+  { key:'12.4', rate:0.124, label:'12.4%', desc:'부가세 0.4% 포함' },
+];
+/* 양도소득세 과세표준 구간: [상한, 기본세율, 누진공제] (원 단위) */
+const CGT = [
+  [ 14_000_000,     0.06,          0 ],
+  [ 50_000_000,     0.15,  1_260_000 ],
+  [ 88_000_000,     0.24,  5_760_000 ],
+  [150_000_000,     0.35, 15_440_000 ],
+  [300_000_000,     0.38, 19_940_000 ],
+  [500_000_000,     0.40, 25_940_000 ],
+  [1_000_000_000,   0.42, 35_940_000 ],
+  [ Infinity,       0.45, 65_940_000 ],
+];
+const BAND_LABEL = [
+  '1,400만 이하','1,400만 초과~5,000만 이하','5,000만 초과~8,800만 이하',
+  '8,800만 초과~1.5억 이하','1.5억 초과~3억 이하','3억 초과~5억 이하',
+  '5억 초과~10억 이하','10억 초과'
+];
+
+/* ===== state ===== */
+const STATE_KEY = 'rem.bid.v1';
+const state = { acq:'1.1' };
+
+/* ===== helpers ===== */
+const $ = s=>document.querySelector(s);
+const nf = n => (Math.round(n||0)).toLocaleString('ko-KR') + ' 원';
+const num = id => Number($(id).value||0);
+
+/* ===== 취득세 chips ===== */
+function renderChips(){
+  const el = $('#acqChips');
+  el.innerHTML = ACQ.map(a=>`
+    <button type="button" class="chip border border-slate-200 rounded-lg px-2 py-2 text-left bg-white hover:bg-slate-50" data-key="${a.key}" aria-pressed="${state.acq===a.key}">
+      <div class="font-bold text-sm pct">${a.label}</div>
+      <div class="text-[10px] text-slate-500 leading-tight mt-0.5">${a.desc}</div>
+    </button>
+  `).join('');
+  el.querySelectorAll('.chip').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.acq = btn.dataset.key;
+      el.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.key===state.acq));
+      calc(); save();
+    });
+  });
+}
+
+/* ===== 세율표 ===== */
+function renderRateTable(){
+  const tb = $('#tbl_rates');
+  tb.innerHTML = CGT.map(([_,r,___],i)=>`
+    <tr class="border-t border-slate-100">
+      <td class="py-1 text-slate-600">${BAND_LABEL[i]}</td>
+      <td class="py-1 text-right font-semibold">${(r*110).toFixed(1)}%</td>
+    </tr>
+  `).join('');
+}
+
+/* ===== 양도세 계산 ===== */
+function cgtOf(base){
+  if(base<=0) return { tax:0, rate:0, idx:-1 };
+  for(let i=0;i<CGT.length;i++){
+    const [cap, rate, ded] = CGT[i];
+    if(base<=cap){
+      const income = base*rate - ded;      // 소득세
+      const tax = Math.max(0, income*1.1); // 지방세 포함
+      return { tax, rate, idx:i };
+    }
+  }
+  return { tax:0, rate:0, idx:-1 };
+}
+
+/* ===== 전체 계산 ===== */
+function calc(){
+  const bid    = num('#in_bid');
+  const sale   = num('#in_sale');
+  const area   = num('#in_area');
+  const extra  = num('#in_extra');
+  const evict  = num('#in_evict');
+  const unpaid = num('#in_unpaid');
+  const repair = num('#in_repair');
+  const loan   = num('#in_loan');
+  const broker = num('#in_broker');
+
+  const acq = ACQ.find(a=>a.key===state.acq);
+  const acqTax = bid * acq.rate;
+  $('#acq_amount').textContent = nf(acqTax);
+  $('#out_acq_label').textContent = `(${acq.label})`;
+
+  const warnArea = area > 85;
+  $('#warn_area').classList.toggle('hidden', !warnArea);
+  $('#acq_hint').textContent = warnArea
+    ? `전용 ${area}㎡ · 85㎡ 초과 → 농어촌특별세 0.2~0.6% 별도 가산 (취득 유형별 상이, 신고 시 확인 필요)`
+    : `${acq.desc} · 입찰가 × ${acq.label}`;
+
+  const margin = sale - bid;
+  const costs = acqTax + extra + evict + unpaid + repair + loan + broker;
+  const base = margin - costs;
+  const { tax, rate, idx } = cgtOf(base);
+  const net = base - tax;
+
+  $('#out_margin').textContent = nf(margin);
+  $('#out_acq').textContent    = nf(acqTax);
+  $('#out_costs').textContent  = nf(costs - acqTax); // 취득세는 위에 따로 표기, 여기는 "그 외 비용 합계"
+  $('#out_base').textContent   = nf(base);
+  $('#out_rate').textContent   = idx<0 ? '—' : `${BAND_LABEL[idx]} · ${(rate*110).toFixed(1)}%`;
+  $('#out_tax').textContent    = nf(tax);
+  $('#out_net').textContent    = nf(net);
+}
+
+/* ===== 저장/복원 ===== */
+const INPUTS = ['#in_bid','#in_sale','#in_area','#in_extra','#in_evict','#in_unpaid','#in_repair','#in_loan','#in_broker'];
+function save(){
+  const data = { acq: state.acq };
+  INPUTS.forEach(id=> data[id] = $(id).value );
+  try{ localStorage.setItem(STATE_KEY, JSON.stringify(data)); }catch{}
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(STATE_KEY); if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d.acq) state.acq = d.acq;
+    INPUTS.forEach(id=>{ if(d[id]!=null) $(id).value = d[id]; });
+  }catch{}
+}
+
+/* ===== 초기화 ===== */
+$('#resetBtn').addEventListener('click', ()=>{
+  INPUTS.forEach(id=> $(id).value = '');
+  state.acq = '1.1';
+  renderChips();
+  save(); calc();
+});
+
+/* ===== 바인딩 ===== */
+INPUTS.forEach(id=>{
+  const el = $(id);
+  el.addEventListener('input', ()=>{ calc(); save(); });
+});
+
+/* ===== init ===== */
+load();
+renderChips();
+renderRateTable();
+calc();
+</script>
+</body>
+</html>
