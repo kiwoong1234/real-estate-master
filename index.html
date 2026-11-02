@@ -42,6 +42,42 @@
   .kv{display:flex;justify-content:space-between;padding:.4rem 0;color:#334155;font-size:.9rem}
   .kv b{font-weight:600;color:#0f172a}
   .pill{display:inline-flex;gap:.25rem;align-items:center;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:600}
+
+  /* 보유개월 picker 버튼 */
+  .months-btn{
+    display:inline-flex;align-items:center;justify-content:space-between;gap:.5rem;
+    width:11rem;max-width:55vw;padding:.4rem .7rem;
+    border:1px solid #e2e8f0;border-radius:.5rem;background:#fff;
+    font-variant-numeric:tabular-nums;color:#0f172a;font-weight:600;
+  }
+  .months-btn:active{background:#f1f5f9}
+  .months-btn .caret{color:#94a3b8;font-size:.7rem}
+
+  /* 바텀시트 */
+  .sheet-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:50;opacity:0;transition:opacity .2s}
+  .sheet-mask.open{opacity:1}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;background:#fff;border-radius:1rem 1rem 0 0;
+    box-shadow:0 -8px 24px rgba(0,0,0,.12);
+    transform:translateY(100%);transition:transform .25s cubic-bezier(.22,.61,.36,1);
+    padding-bottom:env(safe-area-inset-bottom)}
+  .sheet.open{transform:translateY(0)}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;border-bottom:1px solid #f1f5f9}
+  .sheet-head .title{font-weight:600;color:#0f172a}
+  .sheet-head button{font-size:.9rem;padding:.25rem .5rem;border-radius:.4rem}
+  .sheet-cancel{color:#64748b}
+  .sheet-confirm{color:#0ea5e9;font-weight:600}
+
+  /* wheel */
+  .wheel-wrap{position:relative;height:220px;overflow:hidden;touch-action:none;user-select:none}
+  .wheel-line{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);height:44px;
+    border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;pointer-events:none;background:rgba(224,242,254,.35);border-radius:.4rem}
+  .wheel{position:absolute;left:0;right:0;top:0;will-change:transform}
+  .wheel-item{height:44px;display:flex;align-items:center;justify-content:center;
+    font-variant-numeric:tabular-nums;color:#94a3b8;font-size:1rem;transition:color .15s,font-weight .15s,font-size .15s}
+  .wheel-item.active{color:#0f172a;font-weight:700;font-size:1.15rem}
+  .wheel-fade{position:absolute;left:0;right:0;height:60px;pointer-events:none;z-index:2}
+  .wheel-fade.top{top:0;background:linear-gradient(180deg,#fff,rgba(255,255,255,0))}
+  .wheel-fade.bot{bottom:0;background:linear-gradient(0deg,#fff,rgba(255,255,255,0))}
 </style>
 </head>
 <body class="font-sans text-slate-900">
@@ -98,7 +134,14 @@
         <div class="row"><label>명도비</label><input id="in_evict" type="number" inputmode="numeric" placeholder="0" /></div>
         <div class="row"><label>미납관리비</label><label class="flex items-center gap-2"><input id="in_unpaid" type="number" inputmode="numeric" placeholder="0" /></label></div>
         <div class="row"><label>수리비</label><input id="in_repair" type="number" inputmode="numeric" placeholder="0" /></div>
-        <div class="row"><label>대출이자</label><input id="in_loan" type="number" inputmode="numeric" placeholder="0" /></div>
+        <div class="row"><label>대출원금</label><input id="in_loan_principal" type="number" inputmode="numeric" placeholder="0" /></div>
+        <div class="row"><label>연이자율 (%)</label><input id="in_loan_rate" type="number" inputmode="decimal" step="0.01" placeholder="예: 5.5" /></div>
+        <div class="row">
+          <label>보유 개월</label>
+          <button type="button" id="in_loan_months" class="months-btn" aria-haspopup="dialog">
+            <span id="loan_months_label">6 개월</span><span class="caret">▾</span>
+          </button>
+        </div>
         <div class="row"><label>중개수수료</label><input id="in_broker" type="number" inputmode="numeric" placeholder="0" /></div>
       </div>
     </div>
@@ -114,7 +157,8 @@
       <div class="p-4 space-y-1">
         <div class="kv"><span>양도차액 <span class="text-xs text-slate-400">(매도가 − 입찰가)</span></span><b class="num" id="out_margin">0 원</b></div>
         <div class="kv"><span>취득세 <span class="text-xs text-slate-400" id="out_acq_label">(1.1%)</span></span><b class="num" id="out_acq">0 원</b></div>
-        <div class="kv"><span>부대비용 합계</span><b class="num" id="out_costs">0 원</b></div>
+        <div class="kv"><span>대출이자(실제) <span class="text-xs text-slate-400" id="out_loan_label">(보유 6개월)</span></span><b class="num" id="out_loan">0 원</b></div>
+        <div class="kv"><span>부대비용 합계 <span class="text-xs text-slate-400">(취득세·대출이자 제외)</span></span><b class="num" id="out_costs">0 원</b></div>
         <hr class="my-2 border-slate-100" />
         <div class="kv"><span>과세표준 <span class="text-xs text-slate-400">(= 양도차액 − 비용합계)</span></span><b class="num" id="out_base">0 원</b></div>
         <div class="kv"><span>적용 세율 <span class="text-xs text-slate-400">(지방세 10% 포함 실효)</span></span><b class="num" id="out_rate">—</b></div>
@@ -146,6 +190,22 @@
   </footer>
 </div>
 
+<!-- 보유 개월 picker 바텀시트 -->
+<div id="monthsMask" class="sheet-mask hidden" aria-hidden="true"></div>
+<div id="monthsSheet" class="sheet" role="dialog" aria-modal="true" aria-label="보유 개월 선택">
+  <div class="sheet-head">
+    <button type="button" class="sheet-cancel" data-months-close>취소</button>
+    <div class="title">보유 개월</div>
+    <button type="button" class="sheet-confirm" data-months-confirm>확인</button>
+  </div>
+  <div class="wheel-wrap" id="monthsWheelWrap">
+    <div class="wheel-fade top"></div>
+    <div class="wheel-fade bot"></div>
+    <div class="wheel-line"></div>
+    <div class="wheel" id="monthsWheel"></div>
+  </div>
+</div>
+
 <script>
 /* ===== 세율 데이터 ===== */
 const ACQ = [
@@ -173,8 +233,8 @@ const BAND_LABEL = [
 ];
 
 /* ===== state ===== */
-const STATE_KEY = 'rem.bid.v1';
-const state = { acq:'1.1' };
+const STATE_KEY = 'rem.bid.v2';
+const state = { acq:'1.1', months:6 };
 
 /* ===== helpers ===== */
 const $ = s=>document.querySelector(s);
@@ -226,15 +286,17 @@ function cgtOf(base){
 
 /* ===== 전체 계산 ===== */
 function calc(){
-  const bid    = num('#in_bid');
-  const sale   = num('#in_sale');
-  const area   = num('#in_area');
-  const extra  = num('#in_extra');
-  const evict  = num('#in_evict');
-  const unpaid = num('#in_unpaid');
-  const repair = num('#in_repair');
-  const loan   = num('#in_loan');
-  const broker = num('#in_broker');
+  const bid       = num('#in_bid');
+  const sale      = num('#in_sale');
+  const area      = num('#in_area');
+  const extra     = num('#in_extra');
+  const evict     = num('#in_evict');
+  const unpaid    = num('#in_unpaid');
+  const repair    = num('#in_repair');
+  const principal = num('#in_loan_principal');
+  const annRate   = num('#in_loan_rate'); // % 단위
+  const months    = state.months;
+  const broker    = num('#in_broker');
 
   const acq = ACQ.find(a=>a.key===state.acq);
   const acqTax = bid * acq.rate;
@@ -247,25 +309,144 @@ function calc(){
     ? `전용 ${area}㎡ · 85㎡ 초과 → 농어촌특별세 0.2~0.6% 별도 가산 (취득 유형별 상이, 신고 시 확인 필요)`
     : `${acq.desc} · 입찰가 × ${acq.label}`;
 
+  // 실제 대출이자 = 원금 × 연이자율% × (보유개월/12) — 중도상환 전제, 단리 근사
+  const loanInterest = principal * (annRate/100) * (months/12);
+  $('#out_loan_label').textContent = `(보유 ${months}개월${annRate>0 ? ` · 연 ${annRate}%` : ''})`;
+  $('#out_loan').textContent = nf(loanInterest);
+  $('#loan_months_label').textContent = `${months} 개월`;
+
   const margin = sale - bid;
-  const costs = acqTax + extra + evict + unpaid + repair + loan + broker;
+  const otherCosts = extra + evict + unpaid + repair + broker;
+  const costs = acqTax + otherCosts + loanInterest;
   const base = margin - costs;
   const { tax, rate, idx } = cgtOf(base);
   const net = base - tax;
 
   $('#out_margin').textContent = nf(margin);
   $('#out_acq').textContent    = nf(acqTax);
-  $('#out_costs').textContent  = nf(costs - acqTax); // 취득세는 위에 따로 표기, 여기는 "그 외 비용 합계"
+  $('#out_costs').textContent  = nf(otherCosts); // 취득세·대출이자 제외한 그 외 비용
   $('#out_base').textContent   = nf(base);
   $('#out_rate').textContent   = idx<0 ? '—' : `${BAND_LABEL[idx]} · ${(rate*110).toFixed(1)}%`;
   $('#out_tax').textContent    = nf(tax);
   $('#out_net').textContent    = nf(net);
 }
 
+/* ===== 보유 개월 wheel picker ===== */
+const MONTHS_MIN = 1, MONTHS_MAX = 60, ITEM_H = 44;
+const wheelEl = $('#monthsWheel');
+const wheelWrap = $('#monthsWheelWrap');
+const sheetEl = $('#monthsSheet');
+const maskEl = $('#monthsMask');
+let wheelIdx = state.months - MONTHS_MIN;
+let wheelY = 0;
+let dragging = false, startY = 0, startWheelY = 0;
+
+function wheelCenterY(){ return wheelWrap.clientHeight / 2 - ITEM_H/2; }
+function idxToY(idx){ return wheelCenterY() - idx * ITEM_H; }
+function yToIdx(y){ return Math.round((wheelCenterY() - y) / ITEM_H); }
+
+function renderWheel(){
+  let html = '';
+  for(let m=MONTHS_MIN; m<=MONTHS_MAX; m++){
+    const i = m - MONTHS_MIN;
+    html += `<div class="wheel-item${i===wheelIdx?' active':''}" data-idx="${i}">${m} 개월</div>`;
+  }
+  wheelEl.innerHTML = html;
+}
+function applyWheel(animate){
+  wheelEl.style.transition = animate ? 'transform .22s cubic-bezier(.22,.61,.36,1)' : 'none';
+  wheelEl.style.transform = `translateY(${wheelY}px)`;
+}
+function highlightActive(){
+  wheelEl.querySelectorAll('.wheel-item').forEach(el=>{
+    el.classList.toggle('active', Number(el.dataset.idx)===wheelIdx);
+  });
+}
+function openMonthsPicker(){
+  wheelIdx = Math.max(0, Math.min(MONTHS_MAX-MONTHS_MIN, state.months - MONTHS_MIN));
+  renderWheel();
+  maskEl.classList.remove('hidden');
+  requestAnimationFrame(()=>{
+    maskEl.classList.add('open');
+    sheetEl.classList.add('open');
+    requestAnimationFrame(()=>{
+      wheelY = idxToY(wheelIdx);
+      applyWheel(false);
+    });
+  });
+}
+function closeMonthsPicker(){
+  sheetEl.classList.remove('open');
+  maskEl.classList.remove('open');
+  setTimeout(()=> maskEl.classList.add('hidden'), 220);
+}
+function snap(){
+  let idx = yToIdx(wheelY);
+  idx = Math.max(0, Math.min(MONTHS_MAX-MONTHS_MIN, idx));
+  wheelIdx = idx;
+  wheelY = idxToY(idx);
+  applyWheel(true);
+  highlightActive();
+}
+
+$('#in_loan_months').addEventListener('click', openMonthsPicker);
+maskEl.addEventListener('click', closeMonthsPicker);
+sheetEl.querySelector('[data-months-close]').addEventListener('click', closeMonthsPicker);
+sheetEl.querySelector('[data-months-confirm]').addEventListener('click', ()=>{
+  state.months = wheelIdx + MONTHS_MIN;
+  closeMonthsPicker();
+  calc(); save();
+});
+
+/* pointer 기반 드래그 */
+wheelWrap.addEventListener('pointerdown', e=>{
+  dragging = true;
+  startY = e.clientY;
+  startWheelY = wheelY;
+  wheelEl.style.transition = 'none';
+  try{ wheelWrap.setPointerCapture(e.pointerId); }catch{}
+});
+wheelWrap.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  const dy = e.clientY - startY;
+  wheelY = startWheelY + dy;
+  applyWheel(false);
+  // 드래그 중에도 하이라이트 미리 반영
+  const idx = Math.max(0, Math.min(MONTHS_MAX-MONTHS_MIN, yToIdx(wheelY)));
+  if(idx !== wheelIdx){ wheelIdx = idx; highlightActive(); }
+});
+function endDrag(){
+  if(!dragging) return;
+  dragging = false;
+  snap();
+}
+wheelWrap.addEventListener('pointerup', endDrag);
+wheelWrap.addEventListener('pointercancel', endDrag);
+wheelWrap.addEventListener('pointerleave', endDrag);
+/* 아이템 탭 → 바로 그 값으로 */
+wheelEl.addEventListener('click', e=>{
+  if(dragging) return;
+  const it = e.target.closest('.wheel-item');
+  if(!it) return;
+  wheelIdx = Number(it.dataset.idx);
+  wheelY = idxToY(wheelIdx);
+  applyWheel(true);
+  highlightActive();
+});
+/* 데스크톱 마우스 휠 */
+wheelWrap.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const dir = e.deltaY > 0 ? 1 : -1;
+  wheelIdx = Math.max(0, Math.min(MONTHS_MAX-MONTHS_MIN, wheelIdx + dir));
+  wheelY = idxToY(wheelIdx);
+  applyWheel(true);
+  highlightActive();
+}, { passive:false });
+
 /* ===== 저장/복원 ===== */
-const INPUTS = ['#in_bid','#in_sale','#in_area','#in_extra','#in_evict','#in_unpaid','#in_repair','#in_loan','#in_broker'];
+const INPUTS = ['#in_bid','#in_sale','#in_area','#in_extra','#in_evict','#in_unpaid','#in_repair','#in_loan_principal','#in_loan_rate','#in_broker'];
 function save(){
-  const data = { acq: state.acq };
+  const data = { acq: state.acq, months: state.months };
   INPUTS.forEach(id=> data[id] = $(id).value );
   try{ localStorage.setItem(STATE_KEY, JSON.stringify(data)); }catch{}
 }
@@ -274,6 +455,7 @@ function load(){
     const raw = localStorage.getItem(STATE_KEY); if(!raw) return;
     const d = JSON.parse(raw);
     if(d.acq) state.acq = d.acq;
+    if(typeof d.months === 'number') state.months = Math.max(MONTHS_MIN, Math.min(MONTHS_MAX, d.months));
     INPUTS.forEach(id=>{ if(d[id]!=null) $(id).value = d[id]; });
   }catch{}
 }
@@ -282,6 +464,7 @@ function load(){
 $('#resetBtn').addEventListener('click', ()=>{
   INPUTS.forEach(id=> $(id).value = '');
   state.acq = '1.1';
+  state.months = 6;
   renderChips();
   save(); calc();
 });
